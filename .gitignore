@@ -1,0 +1,10 @@
+# Игнорируем абсолютно всё
+*
+
+# Разрешаем Git видеть только эти рабочие файлы
+!database.py
+!entities.py
+!repositories.py
+!schema.sql
+!validator.py
+!.gitignore
