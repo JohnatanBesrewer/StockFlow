@@ -11,7 +11,9 @@ import database
 # add_barcode
 # delete_product
 # update_name
-# remove_barcode
+# add_barcode(...)
+# remove_barcode(...)
+# set_primary_barcode(...)
 
 
 class ProductRepository:
@@ -236,6 +238,28 @@ class ProductRepository:
 
         return [self._build_product_from_row(row) for row in rows]
 
+    # def update_product(
+    #     self,
+    #     product_id: UUID,
+    #     *,
+    #     name: str | None = None,
+    #     unit_id: UUID | None = None,
+    #     price: Decimal | None = None,
+    #     barcodes: list[str] | None = None,
+    # ) -> None:
+    #     pass
+    
+    def delete_product(self, product_id: UUID) -> None:
+        """
+        Удаляет продукт по product_id.        
+        """
+
+        with self._db.transaction() as conn:
+            conn.execute(
+            "DELETE FROM products WHERE product_id = ?",
+            (str(product_id),)
+        )
+    
     def set_sale_price(
         self,
         product_id: UUID | str,
@@ -404,3 +428,4 @@ repo = ProductRepository(database.db)
 # print(repo.search_by_name("зе"))
 
 # repo.set_sale_price("019e8454-c95e-762e-ab07-9ec59acc78b7", Decimal("11.90"))
+# repo.delete_product(UUID("019ebc79-71e0-766e-8e7f-e0005f5299f4"))

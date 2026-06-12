@@ -8,3 +8,4 @@
 !schema.sql
 !validator.py
 !.gitignore
+!requirements.txt
