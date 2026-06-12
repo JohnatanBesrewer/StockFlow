@@ -4,16 +4,7 @@ from decimal import Decimal
 import datetime
 import sqlite3
 import entities
-import validator
 import database
-
-# update_price
-# add_barcode
-# delete_product
-# update_name
-# add_barcode(...)
-# remove_barcode(...)
-# set_primary_barcode(...)
 
 
 class ProductRepository:
@@ -185,9 +176,7 @@ class ProductRepository:
         """
         Получаем продукт по штрихкоду. Используем существующие подзапросы
         для сборки, фильтруя через EXISTS по таблице штрихкодов.
-        """
-        barcode = validator.validate_ean13(barcode)
-
+        """        
         # Просто добавляем условие фильтрации к базовому запросу
         sql = self._PRODUCT_SELECT + """
             WHERE EXISTS (
@@ -262,26 +251,16 @@ class ProductRepository:
     
     def set_sale_price(
         self,
-        product_id: UUID | str,
+        product_id: UUID,
         new_price: Decimal,
-        now: datetime.datetime | None = None,
+        now: datetime.datetime, # для сервиса - now = datetime.datetime.now(datetime.UTC)
     ) -> None:
         """
         Закрывает текущую цену товара и создаёт новую запись цены.
         Сохраняет полную историю изменений.
         """
-
-        if now is None:
-            now = datetime.datetime.now(datetime.UTC)
-
-        if now.tzinfo is None:
-            raise ValueError("now must be timezone-aware")
-
         now_iso = now.astimezone(datetime.UTC).isoformat()
-
-        validated_price = validator.validate_price(new_price)
-        price_cents = int(validated_price * Decimal("100"))
-
+        price_cents = int(new_price * Decimal("100"))
         product_id_str = str(product_id)
 
         with self._db.transaction() as conn:
@@ -353,8 +332,7 @@ class ProductRepository:
     def add_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Добавляет новый EAN-13 штрихкод к продукту.
-        """
-        barcode = validator.validate_ean13(barcode)
+        """        
         now = datetime.datetime.now(datetime.UTC)
         now_iso = now.astimezone(datetime.UTC).isoformat()
 
@@ -364,18 +342,48 @@ class ProductRepository:
                 (barcode, str(product_id), now_iso),
             )
 
+    def count_barcodes(self, product_id: UUID) -> int:
+        """
+        Возвращает количество barcode продукта.
+        """
+        with self._db.read_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM barcodes
+                WHERE product_id = ?
+                """,
+                (str(product_id),),
+            )
+            return cursor.fetchone()[0]
+        
+    def remove_barcode(self, product_id: UUID, barcode: str) -> None:
+        """
+        Удаляет barcode продукта.
+        """
+        with self._db.transaction() as conn:
+            conn.execute(
+                """
+                DELETE FROM barcodes
+                WHERE product_id = ?
+                AND barcode = ?
+                """,
+                (
+                    str(product_id),
+                    barcode,
+                ),
+            )
+    
     def update_name(self, product_id: UUID, new_name: str) -> bool:
         """
         Обновляет имя продукта.
         Возвращает True, если продукт обновлён, False если продукта с таким id нет.
         FTS5 обновляется автоматически триггерами.
-        """
-        name = validator.validate_string(new_name)
-
+        """        
         with self._db.transaction() as conn:
             cursor = conn.execute(
                 "UPDATE products SET name = :name WHERE product_id = :product_id",
-                {"name": name, "product_id": str(product_id)},
+                {"name": new_name, "product_id": str(product_id)},
             )
             return cursor.rowcount > 0
 
