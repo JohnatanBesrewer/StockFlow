@@ -4,7 +4,7 @@
 # Разрешаем Git видеть только эти рабочие файлы
 !database.py
 !entities.py
-!repositories.py
+!productrepo.py
 !schema.sql
 !validator.py
 !.gitignore
