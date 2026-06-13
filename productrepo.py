@@ -498,7 +498,7 @@ class ProductRepository:
 # print(repo.update_name(UUID("019e8454-c95e-762e-ab07-9ec59acc78b7"), "Топор зелёный"))
 # print(repo.get_by_barcode("5901234123457"))
 
-# print(repo.search_by_name("зе"))
+# print(repo.search_by_name("шур", limit=10))
 
 # repo.set_sale_price("019e8454-c95e-762e-ab07-9ec59acc78b7", Decimal("11.90"))
 # repo.delete_product(UUID("019ebc79-71e0-766e-8e7f-e0005f5299f4"))
@@ -506,3 +506,6 @@ class ProductRepository:
 # print(repo.get_price_history("019e8454-c95e-762e-ab07-9ec59acc78b7"))
 # print(repo.get_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
 # print(repo.count_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
+
+# for product in repo.search_by_name("топ",):
+#     print(product.name)

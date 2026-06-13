@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS products (
         length(name) BETWEEN 1
         AND 255
     ),
-    unit TEXT NOT NULL CHECK(unit IN ('шт', 'кг', 'л', 'м')),
+    unit TEXT NOT NULL CHECK(
+        unit IN ('шт', 'кг', 'л', 'м', 'упак', 'компл', 'набор')
+    ),
     created_at TEXT NOT NULL CONSTRAINT chk_products_created_at CHECK (
         created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
     )
@@ -96,7 +98,9 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     product_id TEXT NOT NULL CONSTRAINT chk_transaction_items_product_id CHECK(length(product_id) = 36),
     product_barcode TEXT NOT NULL CONSTRAINT chk_transaction_items_product_barcode CHECK(length(product_barcode) <= 255),
     product_name TEXT NOT NULL CONSTRAINT chk_transaction_items_product_name CHECK(length(product_name) <= 255),
-    product_unit TEXT NOT NULL CHECK(product_unit IN ('шт', 'кг', 'л', 'м')),
+    product_unit TEXT NOT NULL CHECK(
+        product_unit IN ('шт', 'кг', 'л', 'м', 'упак', 'компл', 'набор')
+    ),
     purchase_price_x100 INTEGER CONSTRAINT chk_items_purchase_price_x100 CHECK(
         purchase_price_x100 IS NULL
         OR purchase_price_x100 >= 0

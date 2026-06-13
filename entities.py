@@ -9,11 +9,16 @@ import datetime
 import validator
 
 
+from enum import StrEnum
+
 class Unit(StrEnum):
     PIECE = "шт"
     KG = "кг"
     LITER = "л"
     METRE = "м"
+    PACK = "упак"
+    SET = "компл"
+    KIT = "набор"
 
 
 class TransactionType(StrEnum):
@@ -342,6 +347,7 @@ class Transaction:
             f"supplier_id={self.supplier_id!r}), "
             f"supplier_name={self.supplier_name!r})"
         )
+
 
 @dataclass(frozen=True, slots=True)
 class PriceHistoryEntry:
