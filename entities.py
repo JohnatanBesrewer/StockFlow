@@ -343,7 +343,14 @@ class Transaction:
             f"supplier_name={self.supplier_name!r})"
         )
 
-
+@dataclass(frozen=True, slots=True)
+class PriceHistoryEntry:
+    """
+    Одна запись истории цены товара.
+    """
+    price: Decimal
+    valid_from: datetime.datetime
+    valid_to: datetime.datetime | None
  
 
 

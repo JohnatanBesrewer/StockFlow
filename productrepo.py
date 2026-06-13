@@ -38,7 +38,7 @@ class ProductRepository:
 
     def __init__(self, db: database.Database) -> None:
         self._db = db
-
+    
     @staticmethod
     def _normalize_query(query: str) -> str:
         """
@@ -357,6 +357,28 @@ class ProductRepository:
             )
             return cursor.fetchone()[0]
         
+    def get_barcodes(
+    self,
+    product_id: UUID,
+) -> list[str]:
+        """
+        Возвращает все barcode продукта.
+        Первый элемент списка — первичный barcode.
+        """
+
+        with self._db.read_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT barcode
+                FROM barcodes
+                WHERE product_id = ?
+                ORDER BY created_at ASC
+                """,
+                (str(product_id),),
+            ).fetchall()
+
+        return [row["barcode"] for row in rows]
+        
     def remove_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Удаляет barcode продукта.
@@ -387,8 +409,51 @@ class ProductRepository:
             )
             return cursor.rowcount > 0
 
+    def get_price_history(
+    self,
+    product_id: UUID,
+) -> list[entities.PriceHistoryEntry]:
+        """
+        Возвращает историю изменения цены товара.
+        От старой цены к новой.
+        """
 
-repo = ProductRepository(database.db)
+        with self._db.read_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    price_x100,
+                    valid_from,
+                    valid_to
+                FROM sale_prices
+                WHERE product_id = ?
+                ORDER BY valid_from ASC
+                """,
+                (str(product_id),),
+            ).fetchall()
+
+        result: list[entities.PriceHistoryEntry] = []
+
+        for row in rows:
+            result.append(
+                entities.PriceHistoryEntry(
+                    price=Decimal(row["price_x100"]) / Decimal("100"),
+                    valid_from=datetime.datetime.fromisoformat(
+                        row["valid_from"]
+                    ),
+                    valid_to=(
+                        None
+                        if row["valid_to"] is None
+                        else datetime.datetime.fromisoformat(
+                            row["valid_to"]
+                        )
+                    ),
+                )
+            )
+
+        return result
+
+# repo = ProductRepository(database.db)
 
 
 # product1 = entities.Product(
@@ -437,3 +502,7 @@ repo = ProductRepository(database.db)
 
 # repo.set_sale_price("019e8454-c95e-762e-ab07-9ec59acc78b7", Decimal("11.90"))
 # repo.delete_product(UUID("019ebc79-71e0-766e-8e7f-e0005f5299f4"))
+
+# print(repo.get_price_history("019e8454-c95e-762e-ab07-9ec59acc78b7"))
+# print(repo.get_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
+# print(repo.count_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
