@@ -8,7 +8,7 @@ from entities import Transaction, TransactionItem
 
 
 class TransactionRepository:
-    def __init__(self, db):
+    def __init__(self, db: database.Database):
         self._db = db
 
     # =========================================================
