@@ -1,6 +1,6 @@
 from __future__ import annotations
 from decimal import Decimal
-from uuid import UUID, uuid7
+from uuid import UUID
 from enum import StrEnum, auto
 from dataclasses import dataclass
 import secrets

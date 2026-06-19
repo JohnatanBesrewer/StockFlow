@@ -2,11 +2,11 @@
 *
 
 # Разрешаем Git видеть только эти рабочие файлы
-!database.py
-!entities.py
-!productrepo.py
-!schema.sql
-!validator.py
 !.gitignore
 !requirements.txt
-!transactionrepo.py
+!entities.py
+!validator.py
+!schema.sql
+!database.py
+!product_repository.py
+!transaction_repository.py
