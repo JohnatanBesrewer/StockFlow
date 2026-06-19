@@ -453,7 +453,14 @@ class ProductRepository:
 
         return result
 
-# repo = ProductRepository(database.db)
+
+if __name__ == "__main__":
+    raise RuntimeError("This module is not intended to be run directly")
+
+# db = database.Database("storage.db")
+# db.init_schema("schema.sql")
+
+# repo = ProductRepository(db)
 
 
 # product1 = entities.Product(
@@ -507,5 +514,5 @@ class ProductRepository:
 # print(repo.get_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
 # print(repo.count_barcodes("019e8454-c95e-762e-ab07-9ec59acc78b7"))
 
-# for product in repo.search_by_name("топ",):
+# for product in repo.search_by_name("сварочный",):
 #     print(product.name)

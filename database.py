@@ -88,5 +88,5 @@ class Database:
 if __name__ == "__main__":
     raise RuntimeError("This module is not intended to be run directly")
 
-db = Database("storage.db")
-db.init_schema("schema.sql")
+# db = Database("storage.db")
+# db.init_schema("schema.sql")

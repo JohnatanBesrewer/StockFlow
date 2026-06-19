@@ -352,7 +352,8 @@ class PriceHistoryEntry:
     valid_from: datetime.datetime
     valid_to: datetime.datetime | None
  
-
+if __name__ == "__main__":
+    raise RuntimeError("This module is not intended to be run directly")
 
 # product1 = Product(
 #     None,
