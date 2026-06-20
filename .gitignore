@@ -11,3 +11,4 @@
 !product_repository.py
 !transaction_repository.py
 !product_service.py
+!exceptions.py
