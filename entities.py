@@ -95,15 +95,15 @@ class Product:
         else:
             raise TypeError("created_at must be datetime or None")
 
-    def __eq__(self, other: object) -> bool:
-        """Два товара считаются равными, если совпадает их UUID."""
-        if not isinstance(other, Product):
-            return NotImplemented
-        return self.product_id == other.product_id
+    # def __eq__(self, other: object) -> bool:
+    #     """Два товара считаются равными, если совпадает их UUID."""
+    #     if not isinstance(other, Product):
+    #         return NotImplemented
+    #     return self.product_id == other.product_id
 
-    def __hash__(self) -> int:
-        """Так как __eq__ изменен, хэш тоже должен считаться только по ID."""
-        return hash(self.product_id)
+    # def __hash__(self) -> int:
+    #     """Так как __eq__ изменен, хэш тоже должен считаться только по ID."""
+    #     return hash(self.product_id)
 
     def __repr__(self) -> str:
         """Отладочное представление объекта, пригодное для воссоздания."""
@@ -126,6 +126,7 @@ class TransactionItem:
     если администратор изменит название или штрихкод товара в справочнике,
     в уже проведенных документах данные останутся неизменными.
     """
+
     item_id: UUID
     product_id: UUID
     product_barcode: str
@@ -348,10 +349,12 @@ class PriceHistoryEntry:
     """
     Одна запись истории цены товара.
     """
+
     price: Decimal
     valid_from: datetime.datetime
     valid_to: datetime.datetime | None
- 
+
+
 if __name__ == "__main__":
     raise RuntimeError("This module is not intended to be run directly")
 

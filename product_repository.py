@@ -38,7 +38,7 @@ class ProductRepository:
 
     def __init__(self, db: database.Database) -> None:
         self._db = db
-    
+
     @staticmethod
     def _normalize_query(query: str) -> str:
         """
@@ -176,7 +176,7 @@ class ProductRepository:
         """
         Получаем продукт по штрихкоду. Используем существующие подзапросы
         для сборки, фильтруя через EXISTS по таблице штрихкодов.
-        """        
+        """
         # Просто добавляем условие фильтрации к базовому запросу
         sql = self._PRODUCT_SELECT + """
             WHERE EXISTS (
@@ -237,23 +237,22 @@ class ProductRepository:
     #     barcodes: list[str] | None = None,
     # ) -> None:
     #     pass
-    
+
     def delete_product(self, product_id: UUID) -> None:
         """
-        Удаляет продукт по product_id.        
+        Удаляет продукт по product_id.
         """
 
         with self._db.transaction() as conn:
             conn.execute(
-            "DELETE FROM products WHERE product_id = ?",
-            (str(product_id),)
-        )
-    
+                "DELETE FROM products WHERE product_id = ?", (str(product_id),)
+            )
+
     def set_sale_price(
         self,
         product_id: UUID,
         new_price: Decimal,
-        now: datetime.datetime, # для сервиса - now = datetime.datetime.now(datetime.UTC)
+        now: datetime.datetime,  # для сервиса - now = datetime.datetime.now(datetime.UTC)
     ) -> None:
         """
         Закрывает текущую цену товара и создаёт новую запись цены.
@@ -332,7 +331,7 @@ class ProductRepository:
     def add_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Добавляет новый EAN-13 штрихкод к продукту.
-        """        
+        """
         now = datetime.datetime.now(datetime.UTC)
         now_iso = now.astimezone(datetime.UTC).isoformat()
 
@@ -356,11 +355,11 @@ class ProductRepository:
                 (str(product_id),),
             )
             return cursor.fetchone()[0]
-        
+
     def get_barcodes(
-    self,
-    product_id: UUID,
-) -> list[str]:
+        self,
+        product_id: UUID,
+    ) -> list[str]:
         """
         Возвращает все barcode продукта.
         Первый элемент списка — первичный barcode.
@@ -378,7 +377,7 @@ class ProductRepository:
             ).fetchall()
 
         return [row["barcode"] for row in rows]
-        
+
     def remove_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Удаляет barcode продукта.
@@ -395,13 +394,13 @@ class ProductRepository:
                     barcode,
                 ),
             )
-    
+
     def update_name(self, product_id: UUID, new_name: str) -> bool:
         """
         Обновляет имя продукта.
         Возвращает True, если продукт обновлён, False если продукта с таким id нет.
         FTS5 обновляется автоматически триггерами.
-        """        
+        """
         with self._db.transaction() as conn:
             cursor = conn.execute(
                 "UPDATE products SET name = :name WHERE product_id = :product_id",
@@ -410,9 +409,9 @@ class ProductRepository:
             return cursor.rowcount > 0
 
     def get_price_history(
-    self,
-    product_id: UUID,
-) -> list[entities.PriceHistoryEntry]:
+        self,
+        product_id: UUID,
+    ) -> list[entities.PriceHistoryEntry]:
         """
         Возвращает историю изменения цены товара.
         От старой цены к новой.
@@ -438,15 +437,11 @@ class ProductRepository:
             result.append(
                 entities.PriceHistoryEntry(
                     price=Decimal(row["price_x100"]) / Decimal("100"),
-                    valid_from=datetime.datetime.fromisoformat(
-                        row["valid_from"]
-                    ),
+                    valid_from=datetime.datetime.fromisoformat(row["valid_from"]),
                     valid_to=(
                         None
                         if row["valid_to"] is None
-                        else datetime.datetime.fromisoformat(
-                            row["valid_to"]
-                        )
+                        else datetime.datetime.fromisoformat(row["valid_to"])
                     ),
                 )
             )
@@ -464,7 +459,7 @@ if __name__ == "__main__":
 
 
 # product1 = entities.Product(
-#     None,  # uuid7(),
+#     UUID("019ec200-a249-7232-a328-897f72ec0ea3"),  # uuid7(),
 #     None,  # validate_ean13(code: str) -> str
 #     "Сухари чёрные",
 #     entities.Unit.PIECE,
@@ -472,7 +467,17 @@ if __name__ == "__main__":
 #     None,  # datetime.datetime.now(datetime.UTC),
 # )
 
-# repo.create(product1)
+# try:
+#     repo.create(product1)
+# except sqlite3.Error as e:
+#     print(
+#         {
+#             type(e): type(type(e)),
+#             e: type(e),
+#             e.sqlite_errorname: type(e.sqlite_errorname),
+#             e.sqlite_errorcode: type(e.sqlite_errorcode),
+#         }
+#     )
 
 # product2 = entities.Product(
 #     None,  # uuid7(),
