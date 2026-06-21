@@ -76,12 +76,12 @@ class ProductRepository:
         product_id = row["product_id"]
 
         if row["primary_barcode"] is None:
-            raise RuntimeError(
+            raise exceptions.DataIntegrityError(
                 f"Product {product_id} exists but has no barcodes — нарушена целостность данных"
             )
 
         if row["active_price"] is None:
-            raise RuntimeError(
+            raise exceptions.DataIntegrityError(
                 f"Product {product_id} exists but has no active price — нарушена целостность данных"
             )
 
@@ -224,7 +224,7 @@ class ProductRepository:
             sql += " LIMIT ?"
             params.append(limit)
 
-        with self._db.transaction() as conn:
+        with self._db.read_connection() as conn:
             rows = conn.execute(
                 sql,
                 params,
@@ -276,7 +276,9 @@ class ProductRepository:
             ).fetchone()
 
             if exists is None:
-                raise RuntimeError(f"Product {product_id} does not exist")
+                raise exceptions.DataIntegrityError(
+                    f"Product {product_id} does not exist"
+                )
 
             active = conn.execute(
                 """
@@ -292,7 +294,9 @@ class ProductRepository:
             ).fetchone()
 
             if active is None:
-                raise RuntimeError(f"Product {product_id} has no active price")
+                raise exceptions.DataIntegrityError(
+                    f"Product {product_id} has no active price"
+                )
 
             # Защита от бессмысленного создания новой записи.
             if active["price_x100"] == price_cents:
@@ -485,7 +489,7 @@ if __name__ == "__main__":
 # except exceptions.RepositoryError as e:
 #     import traceback
 #     traceback.print_exc()
-#     print(e, e.__cause__)
+# print(e, e.__cause__)
 
 # product2 = entities.Product(
 #     None,  # uuid7(),
