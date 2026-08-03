@@ -1,8 +1,8 @@
-import sqlite3
-from contextlib import contextmanager
-from collections.abc import Iterator
-from pathlib import Path
 import os
+import sqlite3
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
 
 
 class Database:
@@ -18,7 +18,8 @@ class Database:
         self._timeout = timeout
 
         if not create_if_missing and not self._db_path.exists():
-            raise FileNotFoundError(f"Database file not found: {self._db_path}")
+            raise FileNotFoundError(
+                f"Database file not found: {self._db_path}")
 
         # Настраиваем постоянные параметры БД (WAL, synchronous)
         self._ensure_global_settings()
@@ -48,7 +49,7 @@ class Database:
             conn.close()
 
     @contextmanager
-    def read_connection(self) -> Iterator[sqlite3.Connection]:
+    def read_connection(self) -> Generator[sqlite3.Connection, None, None]:
         """Контекст для чтения (SELECT) без транзакций."""
         conn = self._connect()
         try:
@@ -57,7 +58,7 @@ class Database:
             conn.close()
 
     @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
         """Контекст для изменения данных (INSERT/UPDATE/DELETE)."""
         conn = self._connect()
         try:

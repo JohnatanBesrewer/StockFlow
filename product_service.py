@@ -42,3 +42,6 @@ class ProductService:
 
     def search_products(self, query):
         pass
+
+
+ps = ProductService
