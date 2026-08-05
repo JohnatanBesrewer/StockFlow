@@ -94,7 +94,7 @@ class ProductRepository:
             created_at=datetime.datetime.fromisoformat(row["created_at"]),
         )
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def create(
         self,
         product: entities.Product,
@@ -107,7 +107,8 @@ class ProductRepository:
         """
 
         product_id_str = str(product.product_id)
-        created_at_str = product.created_at.astimezone(datetime.UTC).isoformat()
+        created_at_str = product.created_at.astimezone(
+            datetime.UTC).isoformat()
 
         with self._db.transaction() as conn:
 
@@ -154,7 +155,7 @@ class ProductRepository:
                 ),
             )
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def get_by_id(
         self,
         product_id: UUID | str,
@@ -175,7 +176,25 @@ class ProductRepository:
 
         return self._build_product_from_row(row)
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
+    def get_by_name(
+        self,
+        name: str,
+    ) -> entities.Product | None:
+
+        sql = self._PRODUCT_SELECT + """
+            WHERE p.name = ?
+            """
+
+        with self._db.read_connection() as conn:
+            row = conn.execute(sql, (name,),).fetchone()
+
+        if row is None:
+            return None
+
+        return self._build_product_from_row(row)
+
+    # @exceptions.handle_db_errors
     def get_by_barcode(self, barcode: str) -> entities.Product | None:
         """
         Получаем продукт по штрихкоду. Используем существующие подзапросы
@@ -197,7 +216,7 @@ class ProductRepository:
 
         return self._build_product_from_row(row)
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def search_by_name(
         self,
         query: str,
@@ -232,34 +251,24 @@ class ProductRepository:
 
         return [self._build_product_from_row(row) for row in rows]
 
-    # def update_product(
-    #     self,
-    #     product_id: UUID,
-    #     *,
-    #     name: str | None = None,
-    #     unit_id: UUID | None = None,
-    #     price: Decimal | None = None,
-    #     barcodes: list[str] | None = None,
-    # ) -> None:
-    #     pass
-
-    @exceptions.handle_db_errors
-    def delete_product(self, product_id: UUID) -> None:
+    # @exceptions.handle_db_errors
+    def delete_product(self, product_id: UUID) -> bool:
+        """Удаляет продукт по product_id.
+        Возвращает True, если продукт был удален, и False, если не найден.
         """
-        Удаляет продукт по product_id.
-        """
-
         with self._db.transaction() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 "DELETE FROM products WHERE product_id = ?", (str(product_id),)
             )
+            return cursor.rowcount > 0
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def set_sale_price(
         self,
         product_id: UUID,
         new_price: Decimal,
-        now: datetime.datetime,  # для сервиса - now = datetime.datetime.now(datetime.UTC)
+        # для сервиса - now = datetime.datetime.now(datetime.UTC)
+        now: datetime.datetime,
     ) -> None:
         """
         Закрывает текущую цену товара и создаёт новую запись цены.
@@ -339,7 +348,7 @@ class ProductRepository:
                 ),
             )
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def add_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Добавляет новый EAN-13 штрихкод к продукту.
@@ -353,7 +362,7 @@ class ProductRepository:
                 (barcode, str(product_id), now_iso),
             )
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def count_barcodes(self, product_id: UUID) -> int:
         """
         Возвращает количество barcode продукта.
@@ -369,7 +378,7 @@ class ProductRepository:
             )
             return cursor.fetchone()[0]
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def get_barcodes(
         self,
         product_id: UUID,
@@ -392,7 +401,7 @@ class ProductRepository:
 
         return [row["barcode"] for row in rows]
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def remove_barcode(self, product_id: UUID, barcode: str) -> None:
         """
         Удаляет barcode продукта.
@@ -410,7 +419,7 @@ class ProductRepository:
                 ),
             )
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def update_name(self, product_id: UUID, new_name: str) -> bool:
         """
         Обновляет имя продукта.
@@ -424,7 +433,7 @@ class ProductRepository:
             )
             return cursor.rowcount > 0
 
-    @exceptions.handle_db_errors
+    # @exceptions.handle_db_errors
     def get_price_history(
         self,
         product_id: UUID,
@@ -454,7 +463,8 @@ class ProductRepository:
             result.append(
                 entities.PriceHistoryEntry(
                     price=Decimal(row["price_x100"]) / Decimal("100"),
-                    valid_from=datetime.datetime.fromisoformat(row["valid_from"]),
+                    valid_from=datetime.datetime.fromisoformat(
+                        row["valid_from"]),
                     valid_to=(
                         None
                         if row["valid_to"] is None
@@ -465,6 +475,17 @@ class ProductRepository:
 
         return result
 
+    # def update_product(
+    #     self,
+    #     product_id: UUID,
+    #     *,
+    #     name: str | None = None,
+    #     unit_id: UUID | None = None,
+    #     price: Decimal | None = None,
+    #     barcodes: list[str] | None = None,
+    # ) -> None:
+    #     pass
+
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not intended to be run directly")
@@ -474,6 +495,7 @@ if __name__ == "__main__":
 
 # repo = ProductRepository(db)
 
+# print(repo.get_by_name("Кусок дерьма"))
 
 # product1 = entities.Product(
 #     UUID("019ec200-a249-7232-a328-897f72ec0ea3"),  # uuid7(),

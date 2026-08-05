@@ -1,7 +1,7 @@
 -- T A B L E S
 CREATE TABLE IF NOT EXISTS products (
     product_id TEXT PRIMARY KEY CONSTRAINT chk_products_product_id CHECK(length(product_id) = 36),
-    name TEXT NOT NULL CONSTRAINT chk_products_name CHECK(
+    name TEXT NOT NULL UNIQUE CONSTRAINT chk_products_name CHECK(
         length(name) BETWEEN 1
         AND 255
     ),

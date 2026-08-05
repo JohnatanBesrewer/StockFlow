@@ -102,7 +102,7 @@ def handle_db_errors(func):
 
         # ошибки ограничений (UNIQUE, FK, CHECK)
         except sqlite3.IntegrityError as e:
-            raise ConstraintViolationError("Нарушены ограничения БД") from e
+            raise ConstraintViolationError("Нарушены ограничения БkД") from e
 
         # все остальные ошибки SQLite
         except sqlite3.Error as e:
