@@ -54,7 +54,8 @@ class Product:
         created_at: datetime.datetime | None,
     ) -> None:
         # Валидация ID
-        object.__setattr__(self, "product_id", validator.validate_id(product_id))
+        object.__setattr__(self, "product_id",
+                           validator.validate_id(product_id))
 
         # Генерация или валидация штрихкода
         if primary_barcode is None:
@@ -64,7 +65,8 @@ class Product:
             object.__setattr__(self, "primary_barcode", ean.get_fullcode())
         else:
             object.__setattr__(
-                self, "primary_barcode", validator.validate_ean13(primary_barcode)
+                self, "primary_barcode", validator.validate_ean13(
+                    primary_barcode)
             )
 
         # Валидация строки названия
@@ -77,7 +79,8 @@ class Product:
 
         # Валидация цены
         object.__setattr__(
-            self, "sale_price", validator.validate_price(sale_price, allow_zero=False)
+            self, "sale_price", validator.validate_price(
+                sale_price, allow_zero=False)
         )
 
         # Валидация времени создания (с защитой от микросекундного "будущего")
@@ -131,8 +134,10 @@ class TransactionItem:
     product_id: UUID
     product_barcode: str
     product_name: str
-    quantity: Decimal  # Decimal вместо int позволяет продавать весовой (0.450 кг) и разливной товар
-    unit_value: str  # Хранит текстовое значение (н-р, "кг"). Защищает историю при изменении Enum Unit
+    # Decimal вместо int позволяет продавать весовой (0.450 кг) и разливной товар
+    quantity: Decimal
+    # Хранит текстовое значение (н-р, "кг"). Защищает историю при изменении Enum Unit
+    unit_value: str
     price: Decimal
 
     def __init__(
@@ -147,7 +152,8 @@ class TransactionItem:
     ) -> None:
         # Валидация идентификаторов (конвертируют str в UUID, если необходимо)
         object.__setattr__(self, "item_id", validator.validate_id(item_id))
-        object.__setattr__(self, "product_id", validator.validate_id(product_id))
+        object.__setattr__(self, "product_id",
+                           validator.validate_id(product_id))
 
         # Валидация строковых данных (очистка от лишних пробелов, проверка длины)
         object.__setattr__(
@@ -158,7 +164,8 @@ class TransactionItem:
         )
 
         # Приведение количества к Decimal и проверка на строго положительное значение (> 0)
-        object.__setattr__(self, "quantity", validator.validate_quantity(quantity))
+        object.__setattr__(
+            self, "quantity", validator.validate_quantity(quantity))
 
         # Проверяем, что передан корректный Enum, но сохраняем в поле только его текстовое значение (.value)
         if not isinstance(unit, Unit):
@@ -228,13 +235,15 @@ class Transaction:
 
         # --- Валидация товарных строк ---
         if not isinstance(self.items, tuple) or not self.items:
-            raise ValueError("items must be non-empty tuple of TransactionItem")
+            raise ValueError(
+                "items must be non-empty tuple of TransactionItem")
         if not all(isinstance(item, TransactionItem) for item in self.items):
             raise TypeError("All items must be TransactionItem instances")
 
         # --- Валидация типа транзакции ---
         if not isinstance(self.transaction_type, TransactionType):
-            raise TypeError(f"transaction_type must be {TransactionType.__name__}")
+            raise TypeError(
+                f"transaction_type must be {TransactionType.__name__}")
 
         # --- ВРЕМЕННЫЕ ИНВАРЕАНТЫ (Защита хронологии) ---
         now_utc = datetime.datetime.now(datetime.UTC)
@@ -260,12 +269,14 @@ class Transaction:
             self.transaction_date, datetime.time.min, tzinfo=datetime.UTC
         )
         if self.created_at < start_of_day:
-            raise ValueError("created_at cannot be earlier than transaction_date")
+            raise ValueError(
+                "created_at cannot be earlier than transaction_date")
 
         # 4. Защита от микросекундного рассинхрона часов (зазор в 2 секунды)
         tolerance = datetime.timedelta(seconds=2)
         if self.created_at > now_utc + tolerance:
-            raise ValueError("created_at cannot be significantly in the future")
+            raise ValueError(
+                "created_at cannot be significantly in the future")
 
         # --- Валидация и очистка комментария ---
         if self.comment is not None and not isinstance(self.comment, str):
@@ -273,7 +284,8 @@ class Transaction:
 
         cleaned_comment = None
         if self.comment is not None:
-            cleaned_comment = self.comment.strip()[: validator.MAX_STRING_LENGTH]
+            cleaned_comment = self.comment.strip(
+            )[: validator.MAX_STRING_LENGTH]
             cleaned_comment = cleaned_comment if cleaned_comment else None
         object.__setattr__(self, "comment", cleaned_comment)
 
@@ -289,7 +301,8 @@ class Transaction:
         else:
             # В закупках, списаниях или инвентаризациях скидки быть не должно
             if self.discount != Decimal("0"):
-                raise ValueError("discount must be 0 for non-SALE transactions")
+                raise ValueError(
+                    "discount must be 0 for non-SALE transactions")
 
         # --- Проверка связей с контрагентами (Поставщики) ---
         trns_with_suppl = (
