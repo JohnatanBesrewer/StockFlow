@@ -434,6 +434,26 @@ class ProductRepository:
             return cursor.rowcount > 0
 
     # @exceptions.handle_db_errors
+    def update_unit(self, product_id: UUID, new_unit: entities.Unit) -> bool:
+        """
+        Обновляет единицу измерения продукта.
+        Возвращает True, если продукт обновлён, False если продукта с таким id нет.
+        """
+        with self._db.transaction() as conn:
+            cursor = conn.execute(
+                """
+                UPDATE products
+                SET unit = :unit
+                WHERE product_id = :product_id
+                """,
+                {
+                    "unit": new_unit.value,
+                    "product_id": str(product_id),
+                },
+            )
+            return cursor.rowcount > 0
+
+    # @exceptions.handle_db_errors
     def get_price_history(
         self,
         product_id: UUID,

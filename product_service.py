@@ -30,14 +30,23 @@ class ProductService:
 
         self._repo.create(product)
 
-    def get_product_by_id(self, product_id: UUID) -> entities.Product | None:
-        return self._repo.get_by_id(product_id)
+    def get_product(
+        self,
+        product_id: UUID | None = None,
+        barcode: str | None = None,
+        name: str | None = None
+    ) -> entities.Product | None:
 
-    def get_product_by_name(self, name: str) -> entities.Product | None:
-        return self._repo.get_by_name(name)
+        if product_id:
+            return self._repo.get_by_id(product_id)
 
-    def get_product_by_barcode(self, barcode: str) -> entities.Product | None:
-        return self._repo.get_by_barcode(barcode)
+        if barcode:
+            return self._repo.get_by_barcode(barcode)
+
+        if name:
+            return self._repo.get_by_name(name)
+
+        return
 
     def search_products_by_name(self, query: str, limit: int | None = None) -> list[entities.Product]:
         return self._repo.search_by_name(query, limit)
@@ -72,7 +81,7 @@ ps = ProductService(product_repository.ProductRepository(db))
 #                   None,
 #                   )
 
-print(ps.get_product_by_name("Кусок дерьма"))
-print(ps.get_product_by_barcode("2948505149672"))
+print(ps.get_product(name="Кусок дерьма"))
+print(ps.get_product(barcode="2963939457544"))
 print(ps.search_products_by_name("Д"))
-print(ps.delete_product("019fd138-e1cd-7768-b9d2-4f61e4dbb58d"))
+print(ps.delete_product("019fd20a-fd1e-7124-8b9d-9eb97633b107"))
