@@ -29,7 +29,7 @@ class TransactionType(StrEnum):
     INVENTORY = auto()  # инвентаризация
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class Product:
     """Сущность товара (справочник).
 
@@ -121,7 +121,7 @@ class Product:
         )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, repr=False)
 class TransactionItem:
     """Строка транзакции (позиция документа).
     Содержит снимок (snapshot) информации о товаре, его количестве и цене

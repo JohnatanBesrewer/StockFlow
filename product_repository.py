@@ -68,6 +68,10 @@ class ProductRepository:
         return " AND ".join(tokens)
 
     @staticmethod
+    def _normalize_name(value: str) -> str:
+        return " ".join(value.casefold().split())
+
+    @staticmethod
     def _build_product_from_row(row: sqlite3.Row) -> entities.Product:
         """
         Единый mapper для сборки _Product из строки.
@@ -101,7 +105,7 @@ class ProductRepository:
     ) -> None:
         """
         Сохраняет новый  Product. Вставляет строки в таблицы:
-        - products (product_id, name, unit, created_at),
+        - products (product_id, name, name_normalized, unit, created_at),
         - barcodes (barcode, product_id, created_at),
         - sale_prices (price_id, product_id, price_x100, valid_from)
         """
@@ -110,18 +114,25 @@ class ProductRepository:
         created_at_str = product.created_at.astimezone(
             datetime.UTC).isoformat()
 
+        name_normalized = self._normalize_name(product.name)
+
         with self._db.transaction() as conn:
 
             conn.execute(
                 """
-                INSERT INTO products (
-                    product_id, name, unit, created_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
+            INSERT INTO products (
+                product_id,
+                name,
+                name_normalized,
+                unit,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
                 (
                     product_id_str,
                     product.name,
+                    name_normalized,
                     product.unit.value,
                     created_at_str,
                 ),
@@ -183,11 +194,13 @@ class ProductRepository:
     ) -> entities.Product | None:
 
         sql = self._PRODUCT_SELECT + """
-            WHERE p.name = ?
-            """
+        WHERE p.name_normalized = ?
+        """
+
+        normalized_name = self._normalize_name(name)
 
         with self._db.read_connection() as conn:
-            row = conn.execute(sql, (name,),).fetchone()
+            row = conn.execute(sql, (normalized_name,),).fetchone()
 
         if row is None:
             return None
@@ -349,7 +362,7 @@ class ProductRepository:
             )
 
     # @exceptions.handle_db_errors
-    def add_barcode(self, product_id: UUID, barcode: str) -> None:
+    def add_barcode(self, product_id: UUID, barcode: str) -> bool:
         """
         Добавляет новый EAN-13 штрихкод к продукту.
         """
@@ -357,10 +370,11 @@ class ProductRepository:
         now_iso = now.astimezone(datetime.UTC).isoformat()
 
         with self._db.transaction() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT INTO barcodes (barcode, product_id, created_at) VALUES (?, ?, ?)",
                 (barcode, str(product_id), now_iso),
             )
+            return cursor.rowcount > 0
 
     # @exceptions.handle_db_errors
     def count_barcodes(self, product_id: UUID) -> int:
@@ -402,12 +416,12 @@ class ProductRepository:
         return [row["barcode"] for row in rows]
 
     # @exceptions.handle_db_errors
-    def remove_barcode(self, product_id: UUID, barcode: str) -> None:
+    def delete_barcode(self, product_id: UUID, barcode: str) -> bool:
         """
         Удаляет barcode продукта.
         """
         with self._db.transaction() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 DELETE FROM barcodes
                 WHERE product_id = ?
@@ -418,6 +432,7 @@ class ProductRepository:
                     barcode,
                 ),
             )
+            return cursor.rowcount > 0
 
     # @exceptions.handle_db_errors
     def update_name(self, product_id: UUID, new_name: str) -> bool:
@@ -426,10 +441,22 @@ class ProductRepository:
         Возвращает True, если продукт обновлён, False если продукта с таким id нет.
         FTS5 обновляется автоматически триггерами.
         """
+        normalized_name = self._normalize_name(new_name)
+
         with self._db.transaction() as conn:
             cursor = conn.execute(
-                "UPDATE products SET name = :name WHERE product_id = :product_id",
-                {"name": new_name, "product_id": str(product_id)},
+                """
+            UPDATE products
+            SET
+                name = :name,
+                name_normalized = :name_normalized
+            WHERE product_id = :product_id
+            """,
+                {
+                    "name": new_name,
+                    "name_normalized": normalized_name,
+                    "product_id": str(product_id),
+                },
             )
             return cursor.rowcount > 0
 
@@ -452,6 +479,32 @@ class ProductRepository:
                 },
             )
             return cursor.rowcount > 0
+
+    # @exceptions.handle_db_errors
+    def get_current_price(self, product_id: UUID) -> Decimal | None:
+        """
+        Возвращает актуальную цену продукта на текущий момент.        
+        """
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+
+        with self._db.read_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT price_x100
+                FROM sale_prices
+                WHERE product_id = ?
+                AND valid_from <= ?
+                AND (valid_to IS NULL OR ? < valid_to)
+                ORDER BY valid_from DESC
+                LIMIT 1
+                """,
+                (str(product_id), now, now),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return Decimal(row["price_x100"]) / Decimal("100")
 
     # @exceptions.handle_db_errors
     def get_price_history(
@@ -509,6 +562,7 @@ class ProductRepository:
 
 if __name__ == "__main__":
     raise RuntimeError("This module is not intended to be run directly")
+
 
 # db = database.Database("storage.db")
 # db.init_schema("schema.sql")

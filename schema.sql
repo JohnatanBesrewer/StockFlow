@@ -1,10 +1,14 @@
 -- T A B L E S
 CREATE TABLE IF NOT EXISTS products (
     product_id TEXT PRIMARY KEY CONSTRAINT chk_products_product_id CHECK(length(product_id) = 36),
-    name TEXT NOT NULL UNIQUE CONSTRAINT chk_products_name CHECK(
+    name TEXT NOT NULL CONSTRAINT chk_products_name CHECK(
         length(name) BETWEEN 1
         AND 255
     ),
+    name_normalized TEXT NOT NULL UNIQUE
+        CONSTRAINT chk_products_name_normalized CHECK(
+            length(name_normalized) BETWEEN 1 AND 255
+        ),
     unit TEXT NOT NULL CHECK(
         unit IN ('шт', 'кг', 'л', 'м', 'упак', 'компл', 'набор')
     ),
@@ -132,7 +136,6 @@ CREATE TABLE IF NOT EXISTS transaction_items (
 
 -- I N D E X E S
 -- 1. Таблица products
-CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
 
 -- 2. Таблица barcodes
 CREATE INDEX IF NOT EXISTS idx_barcodes_product_id ON barcodes(product_id, created_at ASC);

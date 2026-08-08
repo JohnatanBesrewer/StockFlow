@@ -6,7 +6,8 @@ from barcode.ean import EAN13
 
 MAX_STRING_LENGTH: Final[int] = 255
 PRICE_PRECISION: Final[Decimal] = Decimal("0.01")
-QTY_PRECISION: Final[Decimal] = Decimal("0.001")  # Точность до тысячных (граммовая)
+QTY_PRECISION: Final[Decimal] = Decimal(
+    "0.001")  # Точность до тысячных (граммовая)
 
 
 def validate_id(value: UUID | str | None = None) -> UUID:
@@ -26,7 +27,8 @@ def validate_id(value: UUID | str | None = None) -> UUID:
     if uuid_obj.version != 7:
         # В системе используются UUIDv7, чтобы идентификаторы были
         # упорядочены по времени и лучше индексировались в БД.
-        raise ValueError(f"id must be UUID version 7, got version {uuid_obj.version}")
+        raise ValueError(
+            f"id must be UUID version 7, got version {uuid_obj.version}")
 
     return uuid_obj
 
@@ -36,13 +38,14 @@ def validate_string(value: str) -> str:
     if not isinstance(value, str):
         raise TypeError(f"value must be str, got {type(value)}")
 
-    cleaned_value = value.strip()
+    cleaned_value = " ".join(value.split())
 
     if not cleaned_value:
         raise ValueError("value cannot be empty or whitespace")
 
     if len(cleaned_value) > MAX_STRING_LENGTH:
-        raise ValueError(f"value exceeds maximum length of {MAX_STRING_LENGTH}")
+        raise ValueError(
+            f"value exceeds maximum length of {MAX_STRING_LENGTH}")
 
     return cleaned_value
 
@@ -86,7 +89,8 @@ def validate_quantity(value: Decimal | int | str) -> Decimal:
         except (ValueError, ArithmeticError) as e:
             raise ValueError(f"Invalid quantity format: '{value}'") from e
     else:
-        raise TypeError(f"quantity must be Decimal, int or str, got {type(value)}")
+        raise TypeError(
+            f"quantity must be Decimal, int or str, got {type(value)}")
 
     # 2. Проверка на конечность числа (Infinity, NaN)
     if not qty_decimal.is_finite():
@@ -117,7 +121,8 @@ def validate_ean13(code: str) -> str:
     if not isinstance(code, str):
         raise ValueError("EAN-13 must be a string")
     if len(code) != 13:
-        raise ValueError(f"Invalid length {len(code)} for EAN-13 (must be 13 digits)")
+        raise ValueError(
+            f"Invalid length {len(code)} for EAN-13 (must be 13 digits)")
     if not code.isdigit():
         raise ValueError("EAN-13 must contain only digits")
 
