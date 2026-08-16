@@ -1,8 +1,12 @@
 from __future__ import annotations
 from uuid import UUID
+from decimal import Decimal
+from collections.abc import Sequence
 import sqlite3
+import datetime
 import database
 import entities
+import validator
 
 
 class TransactionRepository:
@@ -11,29 +15,26 @@ class TransactionRepository:
     def __init__(self, db: database.Database):
         self._db = db
 
-    def create_transaction(
-        self, tx: entities.Transaction, items: list[entities.TransactionItem]
-    ) -> None:
+    def create_transaction(self, tx: entities.Transaction) -> None:
         """
         Сохраняет новую транзакцию и связанные с ней товары в БД.
         Операция выполняется атомарно внутри одной транзакции БД:
         если запись товаров не удастся, запись самой транзакции также откатится.
         Args:
-            tx: Объект транзакции с метаданными (дата, поставщик, суммы).
-            items: Список позиций товаров, входящих в эту транзакцию.
+            tx: Объект транзакции с метаданными (список позиций, дата, поставщик, суммы).
         """
 
         sql_tx = """
         INSERT INTO transactions (
             transaction_id,
             transaction_type,
-            total_amount,
-            discount,
+            total_amount_x100,
+            discount_x100,
             comment,
             transaction_date,
             created_at,
-            supplier_name,
-            supplier_id
+            supplier_id,
+            supplier_name
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
@@ -46,18 +47,17 @@ class TransactionRepository:
             product_barcode,
             product_name,
             product_unit,
-            purchase_price_x100,
-            sale_price_x100,
+            product_price_x100,
             product_quantity_x1000,
             amount_x100
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         with self._db.transaction() as conn:
             conn.execute(sql_tx, self._map_tx_params(tx))
 
-            for item in items:
+            for item in tx.items:
                 conn.execute(sql_item, self._map_item_params(item))
 
     def get_by_id(self, transaction_id: UUID) -> entities.Transaction | None:
@@ -88,10 +88,75 @@ class TransactionRepository:
             if not tx_row:
                 return None
 
-            item_rows = conn.execute(sql_items, (str(transaction_id),)).fetchall()
+            item_rows = conn.execute(
+                sql_items, (str(transaction_id),)).fetchall()
 
         items = [self._map_item(row) for row in item_rows]
         return self._map_tx(tx_row, items)
+
+    def get_by_date(
+            self,
+            transaction_date: datetime.date
+    ) -> list[entities.Transaction]:
+        """
+        Загружает все транзакции за указанную дату вместе с их позициями.
+        Args: transaction_date: Дата транзакций.
+        Returns: Список агрегатов Transaction.
+        """
+
+        sql_tx = """
+        SELECT *
+        FROM transactions
+        WHERE transaction_date = ?
+        """
+
+        sql_items = """
+        SELECT *
+        FROM transaction_items
+        WHERE transaction_id IN ({})
+        """
+
+        with self._db.read_connection() as conn:
+            tx_rows = conn.execute(
+                sql_tx,
+                (transaction_date.isoformat(),)
+            ).fetchall()
+
+            if not tx_rows:
+                return []
+
+            tx_ids = [row["transaction_id"] for row in tx_rows]
+
+            placeholders = ",".join("?" * len(tx_ids))
+
+            item_rows = conn.execute(
+                sql_items.format(placeholders),
+                tx_ids
+            ).fetchall()
+
+        items_by_tx_id: dict[str, list] = {}
+
+        for row in item_rows:
+            item = self._map_item(row)
+
+            items_by_tx_id.setdefault(
+                row["transaction_id"],
+                []
+            ).append(item)
+
+        transactions = []
+
+        for row in tx_rows:
+            items = items_by_tx_id.get(
+                row["transaction_id"],
+                []
+            )
+
+            transactions.append(
+                self._map_tx(row, items)
+            )
+
+        return transactions
 
     def delete(self, transaction_id: UUID) -> None:
         """
@@ -112,7 +177,7 @@ class TransactionRepository:
 
     @staticmethod
     def _map_tx(
-        row: sqlite3.Row, items: list[entities.TransactionItem]
+        row: sqlite3.Row, items: Sequence[entities.TransactionItem]
     ) -> entities.Transaction:
         """
         Преобразует сырую строку результата SQL-запроса (Row) в объект доменной модели Transaction.
@@ -124,14 +189,15 @@ class TransactionRepository:
         """
         return entities.Transaction(
             transaction_id=UUID(row["transaction_id"]),
-            transaction_type=row["transaction_type"],
-            total_amount=row["total_amount"],
-            discount=row["discount"],
+            transaction_type=entities.TransactionType(row["transaction_type"]),
+            discount=Decimal(row["discount_x100"]) / Decimal("100"),
             comment=row["comment"] if row["comment"] else None,
-            transaction_date=row["transaction_date"],
-            created_at=row["created_at"],
+            transaction_date=datetime.date.fromisoformat(
+                row["transaction_date"]),
+            created_at=datetime.datetime.fromisoformat(row["created_at"]),
             supplier_name=row["supplier_name"] if row["supplier_name"] else None,
-            supplier_id=UUID(row["supplier_id"]) if row["supplier_id"] else None,
+            supplier_id=UUID(row["supplier_id"]
+                             ) if row["supplier_id"] else None,
             items=items,
         )
 
@@ -150,11 +216,10 @@ class TransactionRepository:
             product_id=UUID(row["product_id"]),
             product_barcode=row["product_barcode"],
             product_name=row["product_name"],
-            product_unit=row["product_unit"],
-            purchase_price_x100=row["purchase_price_x100"],
-            sale_price_x100=row["sale_price_x100"],
-            product_quantity_x1000=row["product_quantity_x1000"],
-            amount_x100=row["amount_x100"],
+            product_unit=entities.Unit(row["product_unit"]),
+            product_price=Decimal(row["product_price_x100"]) / Decimal("100"),
+            product_quantity=Decimal(
+                row["product_quantity_x1000"]) / Decimal("1000")
         )
 
     @staticmethod
@@ -169,21 +234,21 @@ class TransactionRepository:
         """
         return (
             str(tx.transaction_id),
-            tx.transaction_type,
-            tx.total_amount,
-            tx.discount,
-            tx.comment if tx.supplier_comment else None,
-            tx.transaction_date,
-            tx.created_at,
-            tx.supplier_name if tx.supplier_name else None,
+            tx.transaction_type.value,
+            int(tx.total_amount * 100),
+            int(tx.discount * 100),
+            tx.comment if tx.comment else None,
+            tx.transaction_date.isoformat(),
+            tx.created_at.isoformat(),
             str(tx.supplier_id) if tx.supplier_id else None,
+            tx.supplier_name if tx.supplier_name else None,
         )
 
     @staticmethod
     def _map_item_params(item: entities.TransactionItem):
         """
         Подготавливает кортеж параметров из объекта TransactionItem для SQL-запроса INSERT.
-        Преобразует все UUID-поля в строковый формат.
+        Преобразует все поля в соответствующий формат.
         Args:
             item: Объект доменной модели TransactionItem.
         Returns:
@@ -195,11 +260,10 @@ class TransactionRepository:
             str(item.product_id),
             item.product_barcode,
             item.product_name,
-            item.product_unit,
-            item.purchase_price_x100,
-            item.sale_price_x100,
-            item.product_quantity_x1000,
-            item.amount_x100,
+            item.product_unit.value,
+            int(item.product_price * 100),
+            int(item.product_quantity * 1000),
+            int(item.amount * 100),
         )
 
 

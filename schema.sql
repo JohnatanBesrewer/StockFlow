@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS products (
         unit IN ('шт', 'кг', 'л', 'м', 'упак', 'компл', 'набор')
     ),
     created_at TEXT NOT NULL CONSTRAINT chk_products_created_at CHECK (
-        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     )
 );
 
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS barcodes (
     barcode TEXT PRIMARY KEY CONSTRAINT chk_barcodes_barcode CHECK(length(barcode) = 13),
     product_id TEXT NOT NULL CONSTRAINT chk_barcodes_product_id CHECK(length(product_id) = 36),
     created_at TEXT NOT NULL CONSTRAINT chk_barcodes_created_at CHECK (
-        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     ),
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
 );
@@ -31,11 +31,11 @@ CREATE TABLE IF NOT EXISTS sale_prices (
     product_id TEXT NOT NULL CONSTRAINT chk_sale_prices_product_id CHECK(length(product_id) = 36),
     price_x100 INTEGER NOT NULL CONSTRAINT chk_sale_prices_price_x100 CHECK(price_x100 >= 0),
     valid_from TEXT NOT NULL CONSTRAINT chk_sale_prices_valid_from CHECK (
-        valid_from GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        valid_from GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     ),
     valid_to TEXT DEFAULT NULL CONSTRAINT chk_sale_prices_valid_to CHECK (
         valid_to IS NULL
-        OR valid_to GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        OR valid_to GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     ),
     CONSTRAINT chk_sale_prices_valid_range CHECK (
         valid_to IS NULL
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     supplier_id TEXT PRIMARY KEY CONSTRAINT chk_suppliers_supplier_id CHECK(length(supplier_id) = 36),
     name TEXT NOT NULL UNIQUE CONSTRAINT chk_suppliers_name CHECK(length(name) <= 255),
     created_at TEXT NOT NULL CONSTRAINT chk_suppliers_created_at CHECK (
-        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     )
 );
 
@@ -56,39 +56,39 @@ CREATE TABLE IF NOT EXISTS transactions (
     transaction_id TEXT PRIMARY KEY CONSTRAINT chk_transactions_transaction_id CHECK(length(transaction_id) = 36),
     transaction_type TEXT NOT NULL CONSTRAINT chk_transactions_transaction_type CHECK (
         transaction_type IN (
-            'PURCHASE',
-            'SALE',
-            'RETURN_FROM_CUSTOMER',
-            'RETURN_TO_SUPPLIER',
-            'WRITE_OFF',
-            'DEKITTING',
-            'INVENTORY'
+            'purchase',
+            'sale',
+            'return_from_customer',
+            'return_to_supplier',
+            'write_off',
+            'dekitting',
+            'inventory'
         )
     ),
-    total_amount INTEGER NOT NULL CONSTRAINT chk_transactions_total_amount CHECK(total_amount >= 0),
-    discount INTEGER NOT NULL DEFAULT 0 CONSTRAINT chk_transactions_discount CHECK (
-        discount >= 0
-        AND discount <= total_amount
+    total_amount_x100 INTEGER NOT NULL CONSTRAINT chk_transactions_total_amount_x100 CHECK(total_amount_x100 >= 0),
+    discount_x100 INTEGER NOT NULL DEFAULT 0 CONSTRAINT chk_transactions_discount_x100 CHECK (
+        discount_x100 >= 0
+        AND discount_x100 <= total_amount_x100
     ),
     comment TEXT CONSTRAINT chk_transactions_comment CHECK(length(comment) <= 255),
     transaction_date TEXT NOT NULL CONSTRAINT chk_transactions_transaction_date CHECK (
         transaction_date GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]'
     ),
     created_at TEXT NOT NULL CONSTRAINT chk_transactions_created_at CHECK (
-        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-5][0-9].[0-9][0-9][0-9][0-9][0-9][0-9]+00:00'
+        created_at GLOB '20[0-9][0-9]-[0-1][0-9]-[0-3][0-9][T ][0-2][0-9]:[0-5][0-9]:[0-5][0-9]*'
     ),
-    supplier_name TEXT,
     supplier_id TEXT,
+    supplier_name TEXT,
     CONSTRAINT chk_transactions_supplier_logic CHECK (
         (
-            transaction_type IN ('PURCHASE', 'RETURN_TO_SUPPLIER')
+            transaction_type IN ('purchase', 'return_to_supplier')
             AND supplier_id IS NOT NULL
             AND length(supplier_id) = 36
             AND supplier_name IS NOT NULL
             AND length(supplier_name) <= 255
         )
         OR (
-            transaction_type NOT IN ('PURCHASE', 'RETURN_TO_SUPPLIER')
+            transaction_type NOT IN ('purchase', 'return_to_supplier')
             AND supplier_id IS NULL
             AND supplier_name IS NULL
         )
@@ -100,39 +100,20 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     item_id TEXT PRIMARY KEY CONSTRAINT chk_transaction_items_item_id CHECK(length(item_id) = 36),
     transaction_id TEXT NOT NULL CONSTRAINT chk_transaction_items_transaction_id CHECK(length(transaction_id) = 36),
     product_id TEXT NOT NULL CONSTRAINT chk_transaction_items_product_id CHECK(length(product_id) = 36),
-    product_barcode TEXT NOT NULL CONSTRAINT chk_transaction_items_product_barcode CHECK(length(product_barcode) <= 255),
+    product_barcode TEXT NOT NULL CONSTRAINT chk_transaction_items_product_barcode CHECK(length(product_barcode) = 13),
     product_name TEXT NOT NULL CONSTRAINT chk_transaction_items_product_name CHECK(length(product_name) <= 255),
     product_unit TEXT NOT NULL CHECK(
         product_unit IN ('шт', 'кг', 'л', 'м', 'упак', 'компл', 'набор')
     ),
-    purchase_price_x100 INTEGER CONSTRAINT chk_items_purchase_price_x100 CHECK(
-        purchase_price_x100 IS NULL
-        OR purchase_price_x100 >= 0
-    ),
-    sale_price_x100 INTEGER CONSTRAINT chk_items_sale_price_x100 CHECK(
-        sale_price_x100 IS NULL
-        OR sale_price_x100 >= 0
-    ),
+    product_price_x100 INTEGER NOT NULL
+    CONSTRAINT chk_items_product_price_x100 CHECK (product_price_x100 >= 0),
     product_quantity_x1000 INTEGER NOT NULL CONSTRAINT chk_items_quantity CHECK(product_quantity_x1000 > 0),
-    amount_x100 INTEGER NOT NULL CONSTRAINT chk_items_amount_x100 CHECK(amount_x100 >= 0),
-    CONSTRAINT chk_items_price_exists CHECK (
-        (
-            sale_price_x100 IS NOT NULL
-            AND purchase_price_x100 IS NULL
-        )
-        OR (
-            sale_price_x100 IS NULL
-            AND purchase_price_x100 IS NOT NULL
-        )
-    ),
-    CONSTRAINT chk_items_amount_x100_calc CHECK (
-        amount_x100 = ROUND(
-            product_quantity_x1000 * COALESCE(sale_price_x100, purchase_price_x100) / 1000.0
-        )
-    ),
+    amount_x100 INTEGER NOT NULL
+    CONSTRAINT chk_items_amount_x100 CHECK (amount_x100 >= 0),
+    CONSTRAINT chk_items_price_amount_consistency CHECK (amount_x100 = (product_quantity_x1000 * product_price_x100 + 500) / 1000),
     CONSTRAINT fk_ti_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE CASCADE,
     CONSTRAINT fk_ti_product FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT
-);
+    );
 
 -- I N D E X E S
 -- 1. Таблица products

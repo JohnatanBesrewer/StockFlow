@@ -4,7 +4,7 @@ from uuid import UUID, uuid7
 import datetime
 import entities
 import product_repository
-import database
+# import database
 import validator
 
 
@@ -25,7 +25,7 @@ class ProductService:
         if self.get_product(name=validated_name):
             return None
 
-        if primary_barcode and self.get_product(primary_barcode=primary_barcode):
+        if primary_barcode and self.get_product(barcode=primary_barcode):
             return None
 
         product = entities.Product(
@@ -109,38 +109,36 @@ class ProductService:
                 self._repo.set_sale_price(
                     product.product_id,
                     validated_price,
+                    datetime.datetime.now(datetime.UTC)
                 )
 
         return
 
-    def get_all_products(self):
-        pass
 
+if __name__ == "__main__":
+    raise RuntimeError("This module is not intended to be run directly")
 
-# if __name__ == "__main__":
-#     raise RuntimeError("This module is not intended to be run directly")
+# db = database.Database("storage.db")
+# db.init_schema("schema.sql")
 
-db = database.Database("storage.db")
-db.init_schema("schema.sql")
+# ps = ProductService(product_repository.ProductRepository(db))
 
-ps = ProductService(product_repository.ProductRepository(db))
+# print(ps.create_product("Кусок дерьма",
+#                         entities.Unit.PIECE,
+#                         Decimal(10.25),
+#                         None,
+#                         ))
 
-print(ps.create_product("Кусок дерьма",
-                        entities.Unit.PIECE,
-                        Decimal(10.25),
-                        None,
-                        ))
+# ps.update_product(
+#     UUID("019fe109-6c29-71f7-8c2c-eca6f39707bb"),
+#     new_name="Хуйня2",
+#     new_unit=entities.Unit.SET,
+#     new_barcode="4610044661592",
+#     barcode_to_delete="2933928670131",
+#     new_sale_price=Decimal("118.11")
+# )
 
-ps.update_product(
-    UUID("019fe109-6c29-71f7-8c2c-eca6f39707bb"),
-    new_name="Хуйня",
-    new_unit=entities.Unit.LITER,
-    new_barcode="2929921617464",
-    barcode_to_delete="2933928670131",
-    new_sale_price=Decimal("118.11")
-)
-
-print(ps.get_product(name="хуйня"))
-print(ps.get_product(barcode="2929921617464"))
-print(ps.search_products_by_name("х"))
-print(ps.delete_product("019fe0ee-f1bf-7176-97fe-b0577a490611"))
+# print(ps.get_product(name="хуйня"))
+# print(ps.get_product(barcode="4610044661592"))
+# print(ps.search_products_by_name("х"))
+# print(ps.delete_product("019fe0ee-f1bf-7176-97fe-b0577a490611"))

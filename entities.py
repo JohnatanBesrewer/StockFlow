@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import UUID
 from enum import StrEnum, auto
 from dataclasses import dataclass
+from collections.abc import Sequence
 import secrets
 from barcode.ean import EAN13
 import datetime
@@ -131,95 +132,107 @@ class TransactionItem:
     """
 
     item_id: UUID
+    transaction_id: UUID
     product_id: UUID
     product_barcode: str
     product_name: str
+    product_unit: Unit
+    # цена покупки/продажи
+    product_price: Decimal
     # Decimal вместо int позволяет продавать весовой (0.450 кг) и разливной товар
-    quantity: Decimal
-    # Хранит текстовое значение (н-р, "кг"). Защищает историю при изменении Enum Unit
-    unit_value: str
-    price: Decimal
+    product_quantity: Decimal
 
     def __init__(
         self,
         item_id: UUID | str | None,
+        transaction_id: UUID,
         product_id: UUID | str,
         product_barcode: str,
         product_name: str,
-        quantity: Decimal | int | str,
-        unit: Unit,
-        price: Decimal,
+        product_unit: Unit,
+        product_price: Decimal,
+        product_quantity: Decimal | int | str,
     ) -> None:
-        # Валидация идентификаторов (конвертируют str в UUID, если необходимо)
         object.__setattr__(self, "item_id", validator.validate_id(item_id))
+        object.__setattr__(
+            self, "transaction_id", validator.validate_id(transaction_id))
         object.__setattr__(self, "product_id",
                            validator.validate_id(product_id))
-
-        # Валидация строковых данных (очистка от лишних пробелов, проверка длины)
         object.__setattr__(
-            self, "product_barcode", validator.validate_string(product_barcode)
+            self, "product_barcode", validator.validate_ean13(product_barcode)
         )
         object.__setattr__(
             self, "product_name", validator.validate_string(product_name)
         )
+        if not isinstance(product_unit, Unit):
+            raise TypeError(
+                f"product_unit must be an instance of {Unit.__name__}")
+        object.__setattr__(self, "product_unit", product_unit)
+
+        # Валидация цены (проверка на неотрицательность, округление до копеек)
+        object.__setattr__(self, "product_price", validator.validate_price(
+            product_price, allow_zero=True))
 
         # Приведение количества к Decimal и проверка на строго положительное значение (> 0)
         object.__setattr__(
-            self, "quantity", validator.validate_quantity(quantity))
-
-        # Проверяем, что передан корректный Enum, но сохраняем в поле только его текстовое значение (.value)
-        if not isinstance(unit, Unit):
-            raise TypeError(f"unit must be an instance of {Unit.__name__}")
-        object.__setattr__(self, "unit_value", unit.value)
-
-        # Валидация цены (проверка на неотрицательность, округление до копеек)
-        object.__setattr__(self, "price", validator.validate_price(price))
+            self, "product_quantity", validator.validate_quantity(product_quantity))
 
     @property
     def amount(self) -> Decimal:
         """Вычисляемая стоимость позиции (без учета скидок документа)."""
-        return self.price * self.quantity
+        return self.product_price * self.product_quantity if self.product_price is not None else Decimal("0")
 
-    def __eq__(self, other: object) -> bool:
-        """Бизнес-равенство: строки транзакции равны, если совпадают их UUID."""
-        if not isinstance(other, TransactionItem):
-            return NotImplemented
-        return self.item_id == other.item_id
+    # def __eq__(self, other: object) -> bool:
+    #     """Бизнес-равенство: строки транзакции равны, если совпадают их UUID."""
+    #     if not isinstance(other, TransactionItem):
+    #         return NotImplemented
+    #     return self.item_id == other.item_id
 
-    def __hash__(self) -> int:
-        """Хэш вычисляется по item_id.
+    # def __hash__(self) -> int:
+    #     """Хэш вычисляется по item_id.
 
-        Позволяет использовать объект в set() и в качестве ключей dict().
-        """
-        return hash(self.item_id)
+    #     Позволяет использовать объект в set() и в качестве ключей dict().
+    #     """
+    #     return hash(self.item_id)
 
     def __repr__(self) -> str:
         """Отладочное представление, пригодное для точного воссоздания объекта."""
-        # Для unit мы пытаемся восстановить имя Enum по сохраненному текстовому значению
-        enum_name = next(e.name for e in Unit if e.value == self.unit_value)
+        # Безопасный обратный поиск имени Enum: не падает, если значение удалено из Enum
+        try:
+            unit_repr = f"Unit.{next(e.name for e in Unit if e.name == self.product_unit.name)}"
+        except StopIteration:
+            unit_repr = f"'{self.product_unit.name}'"
+
+        price_repr = (
+            f"Decimal('{self.product_price}')"
+            if self.product_price is not None
+            else "None"
+        )
+
         return (
             f"{self.__class__.__name__}("
             f"item_id=UUID('{self.item_id}'), "
+            f"transaction_id=UUID('{self.transaction_id}'), "
             f"product_id=UUID('{self.product_id}'), "
             f"product_barcode='{self.product_barcode}', "
             f"product_name='{self.product_name}', "
-            f"quantity=Decimal('{self.quantity}'), "
-            f"unit=Unit.{enum_name}, "
-            f"price=Decimal('{self.price}'))"
+            f"product_unit={unit_repr}, "
+            f"product_price={price_repr}, "
+            f"product_quantity=Decimal('{self.product_quantity}')"
+            f")"
         )
 
 
 @dataclass(frozen=True, slots=True, repr=False)
 class Transaction:
     """Сущность транзакции (товарный документ).
-
     Является агрегатом, объединяющим строки движения товаров (TransactionItem).
     Инварианты (правила целостности) проверяются в методе __post_init__.
     """
 
     transaction_id: UUID
-    items: tuple[TransactionItem, ...]
     transaction_type: TransactionType
+    items: Sequence[TransactionItem]
     transaction_date: datetime.date
     created_at: datetime.datetime
     comment: str | None = None
@@ -234,9 +247,9 @@ class Transaction:
         )
 
         # --- Валидация товарных строк ---
-        if not isinstance(self.items, tuple) or not self.items:
+        if not isinstance(self.items, (tuple, list)) or not self.items:
             raise ValueError(
-                "items must be non-empty tuple of TransactionItem")
+                "items must be a non-empty tuple or list of TransactionItem")
         if not all(isinstance(item, TransactionItem) for item in self.items):
             raise TypeError("All items must be TransactionItem instances")
 
@@ -249,7 +262,7 @@ class Transaction:
         now_utc = datetime.datetime.now(datetime.UTC)
         today_utc = now_utc.date()
 
-        # 1. Запрет проведения задним числом в будущее
+        # 1. Запрет проведения в будущее (дата документа не может быть позже текущей даты)
         if type(self.transaction_date) is not datetime.date:
             raise TypeError("transaction_date must be exactly datetime.date")
         if self.transaction_date > today_utc:
@@ -352,7 +365,7 @@ class Transaction:
             f"created_at={self.created_at!r}, "
             f"comment={self.comment!r}, "
             f"discount={self.discount!r}, "
-            f"supplier_id={self.supplier_id!r}), "
+            f"supplier_id={self.supplier_id!r}, "
             f"supplier_name={self.supplier_name!r})"
         )
 
