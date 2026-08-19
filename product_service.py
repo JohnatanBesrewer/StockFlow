@@ -20,9 +20,8 @@ class ProductService:
         sale_price: Decimal,
         primary_barcode: str | None = None,
     ) -> entities.Product | None:
-        validated_name = validator.validate_string(name)
 
-        if self.get_product(name=validated_name):
+        if self.get_product(name=name):
             return None
 
         if primary_barcode and self.get_product(barcode=primary_barcode):
@@ -31,7 +30,7 @@ class ProductService:
         product = entities.Product(
             None,  # UUID
             primary_barcode if primary_barcode else None,
-            validated_name,
+            name,
             unit,
             sale_price,
             None,  # created_at

@@ -52,7 +52,6 @@ def validate_string(value: str) -> str:
 
 def validate_price(value: Decimal, allow_zero: bool = True) -> Decimal:
     """Проверяет цену/сумму и округляет до 2 знаков (денежная точность).
-
     Args:
         value: Проверяемое значение Decimal.
         allow_zero: Если False, значение должно быть строго больше 0 (для цен товаров).
