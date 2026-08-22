@@ -1,9 +1,12 @@
 from __future__ import annotations
 from uuid import UUID
-from decimal import Decimal
-from collections.abc import Sequence
+import enum
 import sqlite3
 import datetime
+from typing import Any
+from dataclasses import dataclass
+from decimal import Decimal
+from collections.abc import Sequence
 import database
 import entities
 import validator
@@ -265,6 +268,338 @@ class TransactionRepository:
             int(item.product_quantity * 1000),
             int(item.amount * 100),
         )
+
+    def find(
+        self,
+        filter_: TransactionFilter,
+    ) -> list[TransactionSummary]:
+        """
+        Находит транзакции, удовлетворяющие фильтру.
+
+        Условия WHERE собираются по каждому полю фильтра независимо
+        и объединяются через AND. Результат сортируется по дате
+        транзакции и времени создания (новые — первыми).
+        """
+
+        sql = """
+            SELECT
+                transaction_id,
+                transaction_type,
+                total_amount_x100,
+                discount_x100,
+                comment,
+                transaction_date,
+                created_at,
+                supplier_id,
+                supplier_name
+            FROM transactions
+        """
+
+        # Части WHERE-условия и соответствующие им параметры
+        # собираются параллельно, чтобы порядок "?" совпадал
+        # с порядком params при финальной подстановке.
+        conditions: list[str] = []
+        params: list[Any] = []
+
+        self._append_in_condition(
+            conditions,
+            params,
+            "transaction_id",
+            filter_.transaction_ids,
+        )
+
+        self._append_in_condition(
+            conditions,
+            params,
+            "transaction_type",
+            filter_.transaction_types,
+        )
+
+        self._append_in_condition(
+            conditions,
+            params,
+            "supplier_id",
+            filter_.supplier_ids,
+        )
+
+        self._append_range_condition(
+            conditions,
+            params,
+            "total_amount_x100",
+            filter_.total_amount,
+        )
+
+        self._append_range_condition(
+            conditions,
+            params,
+            "discount_x100",
+            filter_.discount,
+        )
+
+        self._append_range_condition(
+            conditions,
+            params,
+            "transaction_date",
+            filter_.transaction_date,
+        )
+
+        self._append_comment_condition(
+            conditions,
+            filter_.comment_present,
+        )
+
+        # WHERE добавляется только если есть хотя бы одно условие —
+        # иначе запрос просто вернёт все строки.
+        if conditions:
+            sql += "\nWHERE " + "\nAND ".join(conditions)
+
+        sql += """
+            ORDER BY
+                transaction_date DESC,
+                created_at DESC
+        """
+
+        # Соединение только на чтение — репозиторий не модифицирует данные.
+        with self._db.read_connection() as conn:
+            rows = conn.execute(
+                sql,
+                params,
+            ).fetchall()
+
+        return [
+            self._row_to_summary(row)
+            for row in rows
+        ]
+
+    @staticmethod
+    def _append_in_condition[T](
+        conditions: list[str],
+        params: list[Any],
+        column: str,
+        values: tuple[T, ...],
+    ) -> None:
+        """
+        Добавляет условие `column IN (?, ?, ...)`, если values не пуст.
+
+        Значения передаются как параметризованные плейсхолдеры
+        (защита от SQL-инъекций), а не как строковая конкатенация.
+        """
+
+        if not values:
+            return
+
+        placeholders = ", ".join(
+            "?" for _ in values
+        )
+
+        conditions.append(
+            f"{column} IN ({placeholders})"
+        )
+
+        params.extend(TransactionRepository._prepare_value_for_db(value)
+                      for value in values)
+
+    @staticmethod
+    def _append_range_condition[T](
+        conditions: list[str],
+        params: list[Any],
+        column: str,
+        value: RangeFilter[T] | None,
+    ) -> None:
+        """
+        Добавляет условие для колонки на основе RangeFilter.
+
+        Приоритет: если задан equal — используется `column = ?`
+        (greater/less в этом случае не заданы по инварианту RangeFilter).
+        Иначе добавляются независимые условия `column >= ?` (greater)
+        и/или `column <= ?` (less), которые вместе образуют диапазон.
+        """
+
+        if value is None or value.is_empty():
+            return
+
+        if value.equal is not None:
+            conditions.append(
+                f"{column} = ?"
+            )
+
+            params.append(
+                TransactionRepository._prepare_value_for_db(value.equal)
+            )
+
+            return
+
+        if value.minimum is not None:
+            conditions.append(
+                f"{column} >= ?"
+            )
+
+            params.append(
+                TransactionRepository._prepare_value_for_db(value.minimum)
+            )
+
+        if value.maximum is not None:
+            conditions.append(
+                f"{column} <= ?"
+            )
+
+            params.append(
+                TransactionRepository._prepare_value_for_db(value.maximum)
+            )
+
+    @staticmethod
+    def _append_comment_condition(
+        conditions: list[str],
+        comment_present: bool | None,
+    ) -> None:
+        """
+        Добавляет условие фильтрации по наличию комментария.
+
+        NULL и пустая строка трактуются одинаково — как
+        "комментарий отсутствует".
+        """
+
+        if comment_present is True:
+            conditions.append(
+                "(comment IS NOT NULL AND comment != '')"
+            )
+
+        elif comment_present is False:
+            conditions.append(
+                "(comment IS NULL OR comment = '')"
+            )
+
+    @staticmethod
+    def _row_to_summary(row: sqlite3.Row) -> TransactionSummary:
+        return TransactionSummary(
+            transaction_id=validator.validate_id(row["transaction_id"]),
+            transaction_type=entities.TransactionType(row["transaction_type"]),
+            transaction_date=datetime.date.fromisoformat(
+                row["transaction_date"]),
+            created_at=datetime.datetime.fromisoformat(row["created_at"]),
+            total_amount=Decimal(row["total_amount_x100"]) / Decimal("100"),
+            discount=Decimal(row["discount_x100"]) / Decimal("100"),
+            comment=row["comment"],
+            supplier_id=(
+                validator.validate_id(row["supplier_id"])
+                if row["supplier_id"]
+                else None
+            ),
+            supplier_name=(
+                row["supplier_name"] if row["supplier_name"] else None
+            ),
+        )
+
+    @staticmethod
+    def _prepare_value_for_db[T](value: T) -> Any:
+        """
+        Преобразует значения бизнес-логики
+        в значения, пригодные для SQLite.
+        """
+
+        if isinstance(value, (datetime.date, datetime.datetime)):
+            return value.isoformat()
+
+        if isinstance(value, Decimal):
+            return int(value * 100)
+
+        if isinstance(value, UUID):
+            return str(value)
+
+        if isinstance(value, enum.Enum):
+            return value.value
+
+        return value
+
+
+@dataclass(frozen=True, slots=True)
+class RangeFilter[T]:
+    """
+    Фильтр точного значения или диапазона.
+
+    equal нельзя использовать одновременно
+    с minimum или maximum.
+    """
+
+    equal: T | None = None
+    minimum: T | None = None
+    maximum: T | None = None
+
+    def __post_init__(self) -> None:
+        if self.equal is not None and (
+            self.minimum is not None
+            or self.maximum is not None
+        ):
+            raise ValueError(
+                "equal cannot be combined with minimum or maximum"
+            )
+
+        if (
+            self.minimum is not None
+            and self.maximum is not None
+            and self.minimum > self.maximum
+        ):
+            raise ValueError(
+                "minimum cannot be greater than maximum"
+            )
+
+    def is_empty(self) -> bool:
+        return (
+            self.equal is None
+            and self.minimum is None
+            and self.maximum is None
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TransactionFilter:
+    """
+    Фильтр получения транзакций.
+
+    Пустая коллекция означает отсутствие ограничения.
+    """
+
+    # Точный список ID транзакций (условие IN). Пустой кортеж = без ограничения.
+    transaction_ids: tuple[UUID, ...] = ()
+
+    # Точный список типов транзакций (условие IN).
+    transaction_types: tuple[entities.TransactionType, ...] = ()
+
+    # Точный список ID поставщиков (условие IN).
+    supplier_ids: tuple[UUID, ...] = ()
+
+    # Сумма транзакции в копейках/центах (x100), диапазон или точное значение.
+    total_amount: RangeFilter[Decimal] | None = None
+
+    # Размер скидки в копейках/центах (x100), диапазон или точное значение.
+    discount: RangeFilter[Decimal] | None = None
+
+    # Диапазон дат совершения транзакции.
+    transaction_date: RangeFilter[datetime.date] | None = None
+
+    # None — без ограничения; True — только с комментарием;
+    # False — только без комментария.
+    comment_present: bool | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TransactionSummary:
+    """Краткое представление транзакции для списков и поиска. Не содержит строки товаров."""
+
+    transaction_id: UUID
+
+    transaction_type: entities.TransactionType
+
+    transaction_date: datetime.date
+    created_at: datetime
+
+    total_amount: Decimal
+    discount: Decimal
+
+    comment: str | None = None
+
+    supplier_id: UUID | None = None
+    supplier_name: str | None = None
 
 
 if __name__ == "__main__":
