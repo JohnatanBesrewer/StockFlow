@@ -1,4 +1,5 @@
 from __future__ import annotations
+import database
 import uuid
 import datetime
 from collections.abc import Sequence
@@ -54,17 +55,17 @@ class TransactionService:
         self._repo.create_transaction(transaction)
         return transaction
 
-    def get_transaction(
+    def get_transaction_by_id(
         self,
         transaction_id: uuid.UUID,
     ) -> entities.Transaction | None:
-        return self._transaction_repository.get_by_id(transaction_id)
+        return self._repo.get_by_id(transaction_id)
 
     def get_transactions_by_date(
         self,
         transaction_date: datetime.date,
     ) -> list[entities.Transaction]:
-        return self._transaction_repository.get_by_date(transaction_date)
+        return self._repo.get_by_date(transaction_date)
 
     def search_transactions(
         self,
@@ -87,3 +88,19 @@ class TransactionItemCreate:
     product_unit: entities.Unit
     product_price: Decimal
     product_quantity: Decimal
+
+
+if __name__ == "__main__":
+    raise RuntimeError("This module is not intended to be run directly")
+
+
+# db = database.Database("storage.db")
+# db.init_schema("schema.sql")
+# tr = transaction_repository.TransactionRepository(db)
+# ts = TransactionService(tr)
+
+# # print(ts.get_transaction_by_id(uuid.UUID("01a01553-2b30-7697-be9a-52675016fee6")))
+# # print(ts.get_transactions_by_date(datetime.date(2026, 1, 2)))
+# print(ts.search_transactions(transaction_repository.TransactionFilter(
+#     transaction_ids=(uuid.UUID("01a01553-2b30-7697-be9a-52675016fee6"),)
+# )))

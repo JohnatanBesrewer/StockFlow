@@ -6,7 +6,6 @@ import datetime
 from typing import Any
 from dataclasses import dataclass
 from decimal import Decimal
-from collections.abc import Sequence
 import database
 import entities
 import validator
@@ -94,7 +93,7 @@ class TransactionRepository:
             item_rows = conn.execute(
                 sql_items, (str(transaction_id),)).fetchall()
 
-        items = [self._map_item(row) for row in item_rows]
+        items = tuple(self._map_item(row) for row in item_rows)
         return self._map_tx(tx_row, items)
 
     def get_by_date(
@@ -150,9 +149,11 @@ class TransactionRepository:
         transactions = []
 
         for row in tx_rows:
-            items = items_by_tx_id.get(
-                row["transaction_id"],
-                []
+            items = tuple(
+                items_by_tx_id.get(
+                    row["transaction_id"],
+                    []
+                )
             )
 
             transactions.append(
@@ -180,13 +181,13 @@ class TransactionRepository:
 
     @staticmethod
     def _map_tx(
-        row: sqlite3.Row, items: Sequence[entities.TransactionItem]
+        row: sqlite3.Row, items: tuple[entities.TransactionItem, ...]
     ) -> entities.Transaction:
         """
         Преобразует сырую строку результата SQL-запроса (Row) в объект доменной модели Transaction.
         Args:
             row: Строка данных из таблицы transactions.
-            items: Список уже маппированных объектов TransactionItem.
+            items: Кортеж уже маппированных объектов TransactionItem.
         Returns:
             Экземпляр класса Transaction.
         """
