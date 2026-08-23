@@ -408,43 +408,43 @@ class TransactionRepository:
     ) -> None:
         """
         Добавляет условие для колонки на основе RangeFilter.
-
-        Приоритет: если задан equal — используется `column = ?`
-        (greater/less в этом случае не заданы по инварианту RangeFilter).
-        Иначе добавляются независимые условия `column >= ?` (greater)
-        и/или `column <= ?` (less), которые вместе образуют диапазон.
         """
-
         if value is None or value.is_empty():
             return
 
-        if value.equal is not None:
+        if (
+            value.minimum is not None
+            and value.maximum is not None
+            and value.minimum == value.maximum
+        ):
             conditions.append(
                 f"{column} = ?"
             )
-
             params.append(
-                TransactionRepository._prepare_value_for_db(value.equal)
+                TransactionRepository._prepare_value_for_db(
+                    value.minimum
+                )
             )
-
             return
 
         if value.minimum is not None:
             conditions.append(
                 f"{column} >= ?"
             )
-
             params.append(
-                TransactionRepository._prepare_value_for_db(value.minimum)
+                TransactionRepository._prepare_value_for_db(
+                    value.minimum
+                )
             )
 
         if value.maximum is not None:
             conditions.append(
                 f"{column} <= ?"
             )
-
             params.append(
-                TransactionRepository._prepare_value_for_db(value.maximum)
+                TransactionRepository._prepare_value_for_db(
+                    value.maximum
+                )
             )
 
     @staticmethod
@@ -515,25 +515,14 @@ class TransactionRepository:
 @dataclass(frozen=True, slots=True)
 class RangeFilter[T]:
     """
-    Фильтр точного значения или диапазона.
-
-    equal нельзя использовать одновременно
-    с minimum или maximum.
+    Фильтр диапазона значений.
+    Границы включаются.
     """
 
-    equal: T | None = None
     minimum: T | None = None
     maximum: T | None = None
 
     def __post_init__(self) -> None:
-        if self.equal is not None and (
-            self.minimum is not None
-            or self.maximum is not None
-        ):
-            raise ValueError(
-                "equal cannot be combined with minimum or maximum"
-            )
-
         if (
             self.minimum is not None
             and self.maximum is not None
@@ -545,8 +534,7 @@ class RangeFilter[T]:
 
     def is_empty(self) -> bool:
         return (
-            self.equal is None
-            and self.minimum is None
+            self.minimum is None
             and self.maximum is None
         )
 

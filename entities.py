@@ -3,7 +3,6 @@ from decimal import Decimal
 from uuid import UUID
 from enum import StrEnum, auto
 from dataclasses import dataclass
-from collections.abc import Sequence
 import secrets
 from barcode.ean import EAN13
 import datetime
@@ -232,7 +231,7 @@ class Transaction:
 
     transaction_id: UUID
     transaction_type: TransactionType
-    items: Sequence[TransactionItem]
+    items: tuple[TransactionItem, ...]
     transaction_date: datetime.date
     created_at: datetime.datetime
     comment: str | None = None
@@ -247,9 +246,9 @@ class Transaction:
         )
 
         # --- Валидация товарных строк ---
-        if not isinstance(self.items, (tuple, list)) or not self.items:
+        if not isinstance(self.items, tuple) or not self.items:
             raise ValueError(
-                "items must be a non-empty tuple or list of TransactionItem")
+                "items must be a non-empty tuple of TransactionItem")
         if not all(isinstance(item, TransactionItem) for item in self.items):
             raise TypeError("All items must be TransactionItem instances")
 
