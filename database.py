@@ -74,16 +74,10 @@ class Database:
             conn.close()
 
     def init_schema(self, schema_path: str | os.PathLike[str]) -> None:
-        """Выполняет SQL-скрипт для создания структуры таблиц.
-
-        Использует executescript отдельно, чтобы избежать конфликтов транзакций.
-        """
         schema_sql = Path(schema_path).read_text(encoding="utf-8")
-        conn = self._connect()
-        try:
+
+        with self.transaction() as conn:
             conn.executescript(schema_sql)
-        finally:
-            conn.close()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from uuid import UUID, uuid7
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import datetime
 import sqlite3
 import entities
@@ -51,8 +51,7 @@ class ProductRepository:
             return ""
 
         # 1. Удаляем символы, которые ломают FTS5
-        # % _ " ' : ( ) + - < > = ~ ^ |
-        bad_chars = "%_\"'():+-<>~=^|"
+        bad_chars = "%*_\"'():+-<>~=^|,.;/\\"
         cleaned = query.translate({ord(c): " " for c in bad_chars})
 
         # 2. Разбиваем на слова
@@ -138,7 +137,7 @@ class ProductRepository:
                 ),
             )
 
-            # 3. Вставка в barcodes
+            # Вставка в barcodes
             conn.execute(
                 """
                 INSERT INTO barcodes (barcode, product_id, created_at)
@@ -151,7 +150,7 @@ class ProductRepository:
                 ),
             )
 
-            # 4. Вставка в sale_prices
+            # Вставка в sale_prices
             price_id = uuid7()  # репозиторий может генерировать только свои ключи
             conn.execute(
                 """
@@ -161,7 +160,9 @@ class ProductRepository:
                 (
                     str(price_id),
                     product_id_str,
-                    int(product.sale_price * 100),  # Decimal → INTEGER
+                    # Decimal → INTEGER
+                    int((product.sale_price *
+                        100).to_integral_value(rounding=ROUND_HALF_UP)),
                     created_at_str,
                 ),
             )
@@ -547,17 +548,6 @@ class ProductRepository:
             )
 
         return result
-
-    # def update_product(
-    #     self,
-    #     product_id: UUID,
-    #     *,
-    #     name: str | None = None,
-    #     unit_id: UUID | None = None,
-    #     price: Decimal | None = None,
-    #     barcodes: list[str] | None = None,
-    # ) -> None:
-    #     pass
 
 
 if __name__ == "__main__":

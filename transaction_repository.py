@@ -5,7 +5,7 @@ import sqlite3
 import datetime
 from typing import Any
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import database
 import entities
 import validator
@@ -239,13 +239,13 @@ class TransactionRepository:
         return (
             str(tx.transaction_id),
             tx.transaction_type.value,
-            int(tx.total_amount * 100),
-            int(tx.discount * 100),
-            tx.comment if tx.comment else None,
+            int((tx.total_amount * 100).to_integral_value(rounding=ROUND_HALF_UP)),
+            int((tx.discount * 100).to_integral_value(rounding=ROUND_HALF_UP)),
+            tx.comment if tx.comment is not None else None,
             tx.transaction_date.isoformat(),
             tx.created_at.isoformat(),
-            str(tx.supplier_id) if tx.supplier_id else None,
-            tx.supplier_name if tx.supplier_name else None,
+            str(tx.supplier_id) if tx.supplier_id is not None else None,
+            tx.supplier_name if tx.supplier_name is not None else None,
         )
 
     @staticmethod

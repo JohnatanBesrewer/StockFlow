@@ -102,11 +102,11 @@ def handle_db_errors(func):
 
         # ошибки ограничений (UNIQUE, FK, CHECK)
         except sqlite3.IntegrityError as e:
-            raise ConstraintViolationError("Нарушены ограничения БД") from e
+            raise ConstraintViolationError(str(e)) from e
 
         # все остальные ошибки SQLite
         except sqlite3.Error as e:
-            raise RepositoryError("Ошибка доступа к данным") from e
+            raise RepositoryError(str(e)) from e
 
     return wrapper
 
