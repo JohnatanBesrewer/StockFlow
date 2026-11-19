@@ -117,6 +117,7 @@ class ProductRepository:
 
         with self._db.transaction() as conn:
 
+            # Вставка в products
             conn.execute(
                 """
             INSERT INTO products (

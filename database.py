@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 class Database:
-    """Минималистичная, предсказуемая и полностью контролируемая обёртка над SQLite."""
+    """Минималистичная обёртка над SQLite."""
 
     def __init__(
         self,
@@ -19,69 +19,121 @@ class Database:
 
         if not create_if_missing and not self._db_path.exists():
             raise FileNotFoundError(
-                f"Database file not found: {self._db_path}")
+                f"Database file not found: {self._db_path}"
+            )
 
-        # Настраиваем постоянные параметры БД (WAL, synchronous)
         self._ensure_global_settings()
 
     def _connect(self) -> sqlite3.Connection:
-        """Создаёт соединение с базой.
+        """Создаёт и настраивает новое соединение."""
 
-        isolation_level=None → ручное управление транзакциями через commit()/rollback()
-        """
         conn = sqlite3.connect(
             self._db_path,
             timeout=self._timeout,
-            check_same_thread=False,
             isolation_level=None,
         )
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
+
+        try:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
+        except BaseException:
+            conn.close()
+            raise
+
         return conn
 
     def _ensure_global_settings(self) -> None:
-        """Настройка WAL и синхронизации для всего файла БД."""
-        conn = sqlite3.connect(self._db_path, timeout=self._timeout)
+        """Настраивает постоянный режим журналирования WAL."""
+
+        conn = sqlite3.connect(
+            self._db_path,
+            timeout=self._timeout,
+            isolation_level=None,
+        )
+
         try:
-            conn.execute("PRAGMA journal_mode = WAL;")
-            conn.execute("PRAGMA synchronous = NORMAL;")
+            result = conn.execute(
+                "PRAGMA journal_mode = WAL;"
+            ).fetchone()
+
+            if result is None or result[0].lower() != "wal":
+                raise RuntimeError(
+                    "Failed to enable SQLite WAL mode"
+                )
         finally:
             conn.close()
 
     @contextmanager
-    def read_connection(self) -> Generator[sqlite3.Connection, None, None]:
-        """Контекст для чтения (SELECT) без транзакций."""
+    def read_connection(
+        self,
+    ) -> Generator[sqlite3.Connection, None, None]:
+        """Контекст для выполнения операций чтения."""
+
         conn = self._connect()
+
         try:
             yield conn
         finally:
             conn.close()
 
     @contextmanager
-    def transaction(self) -> Generator[sqlite3.Connection, None, None]:
-        """Контекст для изменения данных (INSERT/UPDATE/DELETE)."""
+    def transaction(
+        self,
+    ) -> Generator[sqlite3.Connection, None, None]:
+        """Контекст транзакции записи."""
+
         conn = self._connect()
+
         try:
-            conn.execute("BEGIN IMMEDIATE;")  # стартуем транзакцию
+            conn.execute("BEGIN IMMEDIATE;")
+
             try:
                 yield conn
-            except Exception:
-                conn.rollback()  # откат при ошибке
+                conn.commit()
+
+            except BaseException:
+                if conn.in_transaction:
+                    conn.rollback()
                 raise
-            else:
-                conn.commit()  # коммит, если всё успешно
+
         finally:
             conn.close()
 
-    def init_schema(self, schema_path: str | os.PathLike[str]) -> None:
-        schema_sql = Path(schema_path).read_text(encoding="utf-8")
+    def init_schema(
+        self,
+        schema_path: str | os.PathLike[str],
+    ) -> None:
+        """Атомарно выполняет SQL-скрипт создания схемы."""
 
-        with self.transaction() as conn:
-            conn.executescript(schema_sql)
+        schema_sql = Path(schema_path).read_text(
+            encoding="utf-8"
+        )
+
+        conn = self._connect()
+
+        try:
+            try:
+                conn.executescript(
+                    "BEGIN IMMEDIATE;\n"
+                    + schema_sql
+                    + "\nCOMMIT;"
+                )
+
+            except BaseException:
+                if conn.in_transaction:
+                    conn.rollback()
+                raise
+
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":
-    raise RuntimeError("This module is not intended to be run directly")
+    raise RuntimeError(
+        "This module is not intended to be run directly"
+    )
+
 
 # db = Database("storage.db")
 # db.init_schema("schema.sql")
